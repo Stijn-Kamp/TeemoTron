@@ -1,8 +1,8 @@
-// retrieve token form .env file
+// Retrieve token from .env file
 import dotenv from "dotenv";
 dotenv.config();
 
-// Import the necessary modules.
+// Import necessary modules
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "url";
@@ -11,6 +11,8 @@ import { __dirname } from "./constants.js";
 // Require the necessary discord.js classes
 import discord from "discord.js";
 const { Client, Collection, Events, GatewayIntentBits } = discord;
+
+// Retrieve token from environment variables
 const token = process.env.TOKEN;
 
 // Create a new client instance

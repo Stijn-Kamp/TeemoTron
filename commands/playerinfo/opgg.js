@@ -11,10 +11,7 @@ async function getSummonerInfo(region, summonerName) {
         await driver.get(url);
 
         // Wait for the page to load
-        await driver.wait(
-            until.elementLocated(By.css(".css-1v663t.e1x14w4w1")),
-            5000
-        );
+        await driver.wait(until.elementLocated(By.className("content")), 5000);
 
         // Scrape the data
         const rankSolo = await driver

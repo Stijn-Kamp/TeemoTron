@@ -14,20 +14,23 @@ const clientId = process.env.CLIENT_ID;
 const guildId = process.env.GUILD_ID;
 
 const commands = [];
+
 // Grab all the command files from the commands directory you created earlier
-const foldersPath = path.join(__dirname, "commands");
-const commandFolders = fs.readdirSync(foldersPath);
+const commandsFolder = "commands";
+const commandsPath = path.join(__dirname, commandsFolder);
+const commandFolders = fs.readdirSync(commandsPath);
 
 for (const folder of commandFolders) {
-    // Grab all the command files from the commands directory you created earlier
-    const commandsPath = path.join(foldersPath, folder);
+    const folderPath = path.join(commandsPath, folder);
     const commandFiles = fs
-        .readdirSync(commandsPath)
+        .readdirSync(folderPath)
         .filter((file) => file.endsWith(".js"));
+
     // Grab the SlashCommandBuilder#toJSON() output of each command's data for deployment
     for (const file of commandFiles) {
-        const filePath = pathToFileURL(path.join(commandsPath, file));
+        const filePath = pathToFileURL(path.join(folderPath, file));
         const command = await import(filePath);
+
         if ("data" in command && "execute" in command) {
             commands.push(command.data.toJSON());
         } else {
@@ -41,14 +44,14 @@ for (const folder of commandFolders) {
 // Construct and prepare an instance of the REST module
 const rest = new REST().setToken(token);
 
-// and deploy your commands!
+// Deploy the commands
 (async () => {
     try {
         console.log(
             `Started refreshing ${commands.length} application (/) commands.`
         );
 
-        // The put method is used to fully refresh all commands in the guild with the current set
+        // Use the put method to fully refresh all commands in the guild with the current set
         const data = await rest.put(
             Routes.applicationGuildCommands(clientId, guildId),
             { body: commands }
@@ -58,7 +61,7 @@ const rest = new REST().setToken(token);
             `Successfully reloaded ${data.length} application (/) commands.`
         );
     } catch (error) {
-        // And of course, make sure you catch and log any errors!
+        // Catch and log any errors
         console.error(error);
     }
 })();
