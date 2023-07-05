@@ -33,4 +33,5 @@ async function main() {
     console.log(summonerInfo);
 }
 
-main();
+// only run the code if this file is being run directly
+if (import.meta.main) main();
