@@ -1,7 +1,6 @@
 // Desc: Replies with Pong!
 
-import discord from "discord.js";
-const { SlashCommandBuilder } = discord;
+import { SlashCommandBuilder } from "discord.js";
 
 export const data = new SlashCommandBuilder()
     .setName("ping")

@@ -11,6 +11,7 @@ import { __dirname } from "./constants.js";
 const { REST, Routes } = discord;
 const token = process.env.TOKEN;
 const clientId = process.env.CLIENT_ID;
+const guild = process.env.GUILD_ID;
 
 const commands = [];
 
@@ -51,6 +52,11 @@ const rest = new REST().setToken(token);
         );
 
         // Use the put method to fully refresh all commands in the guild with the current set
+        await rest.put(Routes.applicationGuildCommands(clientId, guild), {
+            body: commands,
+        });
+
+        // Use the put method to fully refresh all commands in all guilds
         const data = await rest.put(Routes.applicationCommands(clientId), {
             body: commands,
         });

@@ -1,4 +1,5 @@
-import fetch from "node-fetch";
+import { SlashCommandBuilder } from "discord.js";
+
 import selenium from "selenium-webdriver";
 const { Builder, By, Key, until } = selenium;
 
@@ -32,6 +33,14 @@ async function main() {
     const summonerInfo = await getSummonerInfo("euw", "Annénas");
     console.log(summonerInfo);
 }
+
+export const data = new SlashCommandBuilder()
+    .setName("opgg")
+    .setDescription("Retrieves summoner info from op.gg");
+
+export const execute = async (interaction) => {
+    await interaction.reply(getSummonerInfo("euw", "Annénas"));
+};
 
 // only run the code if this file is being run directly
 if (import.meta.main) main();
