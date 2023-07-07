@@ -4,15 +4,74 @@ const { SlashCommandBuilder, EmbedBuilder } = discord;
 import { fileURLToPath } from "url";
 
 import selenium from "selenium-webdriver";
+import chrome from "selenium-webdriver/chrome.js";
+
+const screen = {
+    width: 640,
+    height: 480,
+};
 
 const { Browser, Builder, By, Key, until } = selenium;
 
+function convertToTimestamp(sentence) {
+    const lowercaseSentence = sentence.toLowerCase();
+    const now = Date.now();
+    const match = lowercaseSentence.match(/\d+/);
+
+    if (lowercaseSentence.includes("seconds ago")) {
+        if (match) {
+            const secondsAgo = parseInt(match[0]);
+            return now - secondsAgo * 1000;
+        }
+    }
+
+    if (lowercaseSentence.includes("minutes ago")) {
+        if (match) {
+            const minutesAgo = parseInt(match[0]);
+            return now - minutesAgo * 60 * 1000;
+        }
+    }
+
+    if (lowercaseSentence.includes("hours ago")) {
+        if (match) {
+            const hoursAgo = parseInt(match[0]);
+            return now - hoursAgo * 60 * 60 * 1000;
+        }
+    }
+
+    if (lowercaseSentence.includes("days ago")) {
+        if (match) {
+            const daysAgo = parseInt(match[0]);
+            return now - daysAgo * 24 * 60 * 60 * 1000;
+        }
+    }
+
+    if (lowercaseSentence.includes("months ago")) {
+        if (match) {
+            const monthsAgo = parseInt(match[0]);
+            const date = new Date(now);
+            date.setMonth(date.getMonth() - monthsAgo);
+            return date.getTime();
+        }
+    }
+
+    // If the sentence doesn't match any of the expected formats, return now
+    return now;
+}
+
 async function getSummonerInfo(region, summonerName) {
+    if (!region) {
+        region = "euw";
+    }
+    summonerName = summonerName.replace(" ", "+");
+
     const driver = await new Builder()
         .forBrowser(Browser.CHROME)
-        .setChromeOptions(/* ... */)
+        .setChromeOptions(new chrome.Options().headless().windowSize(screen))
         .build();
-    const url = `https://www.op.gg/summoners/${region}/${summonerName}`;
+
+    const baseUrl = "https://www.op.gg";
+    const url = `${baseUrl}/summoners/${region}/${summonerName}`;
 
     try {
         // Navigate to the page
@@ -20,6 +79,24 @@ async function getSummonerInfo(region, summonerName) {
 
         // Wait for the page to load
         await driver.wait(until.elementLocated(By.className("content")), 5000);
+
+        const title = "OP.GG";
+        const logo = await driver
+            .findElement(By.css("img[alt*='OP.GG logo']"))
+            .getAttribute("src");
+        const description = await driver
+            .findElement(By.className("header-info"))
+            .getText();
+        const footer = await driver.findElement(By.css("small")).getText();
+
+        const website = {
+            baseUrl,
+            url,
+            logo,
+            title,
+            description,
+            footer,
+        };
 
         const contentHeader = await driver.findElement(By.id("content-header"));
         const contentContainer = await driver.findElement(
@@ -30,6 +107,10 @@ async function getSummonerInfo(region, summonerName) {
         const profileName = await contentHeader
             .findElement(By.className("summoner-name"))
             .getText();
+        const profileIcon = await contentHeader
+            .findElement(By.className("profile-icon"))
+            .findElement(By.css("img"))
+            .getAttribute("src");
         const level = await contentHeader
             .findElement(By.css(".level .level"))
             .getText();
@@ -39,42 +120,46 @@ async function getSummonerInfo(region, summonerName) {
         const ladderRank = await contentHeader
             .findElement(By.css(".ranking"))
             .getText();
-        const lastUpdated = await contentHeader
+        var lastUpdated = await contentHeader
             .findElement(By.css(".last-update div"))
             .getText();
+        lastUpdated = convertToTimestamp(lastUpdated);
 
         const header = {
             profileName,
+            profileIcon,
             level,
             previousTier,
             ladderRank,
             lastUpdated,
         };
 
-        const rankedSoloHeader = await driver
+        const rankedSoloHeader = await contentContainer
             .findElement(By.css(".header"))
             .getText();
-        const rankedSoloTier = await driver
+        const rankedSoloTier = await contentContainer
             .findElement(By.css(".tier"))
             .getText();
-        const rankedSoloLP = await driver.findElement(By.css(".lp")).getText();
-        const rankedSoloWinLose = await driver
+        const rankedSoloLP = await contentContainer
+            .findElement(By.css(".lp"))
+            .getText();
+        const rankedSoloWinLose = await contentContainer
             .findElement(By.css(".win-lose"))
             .getText();
-        const rankedSoloWinRate = await driver
+        const rankedSoloWinRate = await contentContainer
             .findElement(By.css(".ratio"))
             .getText();
 
-        const rankedFlexHeader = await driver
+        const rankedFlexHeader = await contentContainer
             .findElement(By.css(".header"))
             .getText();
-        const rankedFlexStatusElement = await driver.findElement(
+        const rankedFlexStatusElement = await contentContainer.findElement(
             By.css(".unranked")
         );
         const rankedFlexStatus = await rankedFlexStatusElement.getText();
 
         const champions = [];
-        const championBoxes = await driver.findElements(
+        const championBoxes = await contentContainer.findElements(
             By.css(".champion-box")
         );
         for (const championBox of championBoxes) {
@@ -111,6 +196,7 @@ async function getSummonerInfo(region, summonerName) {
         };
 
         return {
+            website,
             header,
             container,
         };
@@ -125,7 +211,15 @@ async function getSummonerInfo(region, summonerName) {
 function createProfileEmbed(profileData) {
     // Extract profile information
     const {
-        header: { profileName, level, previousTier, ladderRank, lastUpdated },
+        website: { baseUrl, url, logo, title, description, footer },
+        header: {
+            profileName,
+            profileIcon,
+            level,
+            previousTier,
+            ladderRank,
+            lastUpdated,
+        },
         container: {
             rankedSoloHeader,
             rankedSoloTier,
@@ -141,34 +235,28 @@ function createProfileEmbed(profileData) {
     // Create a new embed
     const embed = new EmbedBuilder()
         .setColor(0x0099ff)
-        .setTitle("Player Profile")
-        .setURL("https://discord.js.org/")
+        .setTitle(profileName)
+        .setThumbnail(profileIcon)
+        .setURL(url)
         .setAuthor({
-            name: profileName,
-            iconURL: "https://i.imgur.com/AfFp7pu.png",
-            url: "https://discord.js.org",
+            name: title,
+            iconURL: logo,
+            url: baseUrl,
         })
-        .setDescription("Some description here")
-        .setThumbnail("https://i.imgur.com/AfFp7pu.png")
+        .setDescription("Player profile from OP.GG")
         .addFields(
-            { name: "Profile Name", value: profileName },
             { name: "Level", value: level },
             { name: "Previous Tier", value: previousTier },
             { name: "Ladder Rank", value: ladderRank },
-            { name: "Last Updated", value: lastUpdated },
-            { name: "Ranked Solo", value: rankedSoloHeader },
             { name: "Tier", value: rankedSoloTier },
             { name: "LP", value: rankedSoloLP },
             { name: "Win/Loss", value: rankedSoloWinLose },
             { name: "Win Rate", value: rankedSoloWinRate },
-            { name: "Ranked Flex", value: rankedFlexHeader },
-            { name: "Status", value: rankedFlexStatus }
+            { name: "Ranked Flex", value: rankedFlexStatus }
         )
-        .setImage("https://i.imgur.com/AfFp7pu.png")
-        .setTimestamp()
+        .setTimestamp(lastUpdated)
         .setFooter({
-            text: "Some footer text here",
-            iconURL: "https://i.imgur.com/AfFp7pu.png",
+            text: title,
         });
 
     return embed;
@@ -184,11 +272,33 @@ async function main() {
 
 export const data = new SlashCommandBuilder()
     .setName("opgg")
-    .setDescription("Retrieves summoner info from op.gg");
+    .setDescription("Retrieves summoner info from op.gg")
+    .addStringOption((option) =>
+        option
+            .setName("summonername")
+            .setDescription("The name of the summoner")
+            .setRequired(true)
+    )
+    .addStringOption((option) =>
+        option
+            .setName("server")
+            .setDescription("The server the summoner is on")
+            .addChoices(
+                { name: "EUW", value: "euw" },
+                { name: "EUNE", value: "eune" },
+                { name: "NA", value: "na" },
+                { name: "KR", value: "kr" },
+                { name: "JP", value: "jp" },
+                { name: "OCE", value: "oce" }
+            )
+    );
 
 export const execute = async (interaction) => {
     await interaction.deferReply();
-    getSummonerInfo("euw", "Annénas")
+    const server = interaction.options.getString("server");
+    const summonerName = interaction.options.getString("summonername");
+
+    getSummonerInfo(server, summonerName)
         .then((summonerInfo) => {
             if (summonerInfo) {
                 const embedMessage = createProfileEmbed(summonerInfo);
