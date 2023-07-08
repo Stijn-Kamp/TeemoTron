@@ -1,63 +1,12 @@
 import discord from "discord.js";
 const { SlashCommandBuilder, EmbedBuilder } = discord;
 
-import { fileURLToPath } from "url";
-
 import selenium from "selenium-webdriver";
-import chrome from "selenium-webdriver/chrome.js";
+const { By, until } = selenium;
 
-const screen = {
-    width: 640,
-    height: 480,
-};
-
-const { Browser, Builder, By, Key, until } = selenium;
-
-function convertToTimestamp(sentence) {
-    const lowercaseSentence = sentence.toLowerCase();
-    const now = Date.now();
-    const match = lowercaseSentence.match(/\d+/);
-
-    if (lowercaseSentence.includes("seconds ago")) {
-        if (match) {
-            const secondsAgo = parseInt(match[0]);
-            return now - secondsAgo * 1000;
-        }
-    }
-
-    if (lowercaseSentence.includes("minutes ago")) {
-        if (match) {
-            const minutesAgo = parseInt(match[0]);
-            return now - minutesAgo * 60 * 1000;
-        }
-    }
-
-    if (lowercaseSentence.includes("hours ago")) {
-        if (match) {
-            const hoursAgo = parseInt(match[0]);
-            return now - hoursAgo * 60 * 60 * 1000;
-        }
-    }
-
-    if (lowercaseSentence.includes("days ago")) {
-        if (match) {
-            const daysAgo = parseInt(match[0]);
-            return now - daysAgo * 24 * 60 * 60 * 1000;
-        }
-    }
-
-    if (lowercaseSentence.includes("months ago")) {
-        if (match) {
-            const monthsAgo = parseInt(match[0]);
-            const date = new Date(now);
-            date.setMonth(date.getMonth() - monthsAgo);
-            return date.getTime();
-        }
-    }
-
-    // If the sentence doesn't match any of the expected formats, return now
-    return now;
-}
+import { fileURLToPath } from "url";
+import { convertToTimestamp } from "../../utils/convertToTimestamp.js";
+import { createDriver, quitDriver } from "../../utils/seleniumDriver.js";
 
 async function getSummonerInfo(region, summonerName) {
     if (!region) {
@@ -65,10 +14,7 @@ async function getSummonerInfo(region, summonerName) {
     }
     summonerName = summonerName.replace(" ", "+");
 
-    const driver = await new Builder()
-        .forBrowser(Browser.CHROME)
-        .setChromeOptions(new chrome.Options().headless().windowSize(screen))
-        .build();
+    const driver = await createDriver();
 
     const baseUrl = "https://www.op.gg";
     const url = `${baseUrl}/summoners/${region}/${summonerName}`;
@@ -78,7 +24,7 @@ async function getSummonerInfo(region, summonerName) {
         await driver.get(url);
 
         // Wait for the page to load
-        await driver.wait(until.elementLocated(By.className("content")), 5000);
+        await driver.wait(until.elementLocated(By.className("content")), 7000);
 
         const title = "OP.GG";
         const logo = await driver
@@ -203,8 +149,7 @@ async function getSummonerInfo(region, summonerName) {
     } catch (err) {
         console.error(err);
     } finally {
-        // Close the browser
-        await driver.quit();
+        await quitDriver(driver);
     }
 }
 
